@@ -1,0 +1,8 @@
+verbose: true # Default is off
+hostname: hostname
+notifiers:
+  stdout: {}
+units:
+- unicorn.service
+- nginx.service
+- sidekiq.service

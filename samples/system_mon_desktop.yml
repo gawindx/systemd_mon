@@ -1,0 +1,10 @@
+verbose: true # Default is off
+hostname: hostname
+notifiers:
+  desktop:
+   start_stop_message: false
+   timeout: 2000
+units:
+- unicorn.service
+- nginx.service
+- sidekiq.service

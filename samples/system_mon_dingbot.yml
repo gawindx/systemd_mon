@@ -1,0 +1,10 @@
+verbose: true # Default is off
+hostname: hostname
+notifiers:
+  ding:
+    endpoint: https://oapi.dingtalk.com/robot/send
+    access_token: accesstokenhere
+units:
+- unicorn.service
+- nginx.service
+- sidekiq.service

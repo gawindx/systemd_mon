@@ -1,0 +1,11 @@
+verbose: true # Default is off
+hostname: hostname
+notifiers:
+  hipchat:
+    token: bigsecrettokenhere
+    room: myroom
+    username: doge
+units:
+- unicorn.service
+- nginx.service
+- sidekiq.service
