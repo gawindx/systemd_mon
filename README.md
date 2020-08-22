@@ -121,10 +121,10 @@ SystemdMon does simple analysis on the history of state changes, so it can summa
 
 You'll also want to know if SystemdMon itself falls over, and when it starts back up again. It will attempt to send a final notification before it exits, and one to say it's starting. However, be aware that it might not send a notification in some conditions (e.g. in the case of a SIGKILL), or a network failure. The age-old question: who will watch the watcher?
 
-## Docker integration
+## Get Image Container
 
 You can either:
-- Create your own image via the Dockerfile provides
+- Create your own image via the Dockerfile provides (with Docker or Buildah)
 
 ```
 cd ./systemd_mon_directory/
@@ -136,15 +136,36 @@ where "systemd_mon-image-name" is the name of the image you want to create
 - Directly use the image created on my docker hub (https://hub.docker.com/r/gawindx/systemd_mon)
 
 ```
-docker pull gawindx / systemd_mon: latest
+docker pull gawindx/systemd_mon:latest
 ```
 
 Since systemd_mon relies on dbus, you need to mount the host dbus directory into your container. Besides that, the configuration filename is currently hardcoded to systemd_mon.yml. You have to mount the directory where the systemd_mon.yml file is located on your host system into your container as well. Below is a working example:
 
 ```
-docker run --name "systemd_mon" -v /var/run/dbus:/var/run/dbus -v /path/to/systemd_mon/config/:/systemd_mon/ gawindx/systemd_mon
+docker run --name "systemd_mon" \
+            -v /var/run/dbus:/var/run/dbus \
+            -v /path/to/systemd_mon/config/:/systemd_mon/ \
+            -d \
+            gawindx/systemd_mon
 ```
 
+## Podman integration
+Similar to using the systemdmon container with docker, you will need the image for use with podman (see "Get Image" above).
+
+You can then launch the container as follows:
+```
+podman run --name "systemdmon"\
+           --rm \
+           --replace \
+           --log-driver journald \
+           --network host \
+           --volume /var/run/dbus:/var/run/dbus:ro \
+           --volume /var/Pod_Data/SystemdMon/config:/systemd_mon \
+           -d \
+           gawindx/systemd_mon:latest
+```
+
+## Docker/Systemd integration
 If you want to run this image with systemd (very handy on CoreOS for example) you can use it as follows:
 
 ```
@@ -158,11 +179,60 @@ Restart=always
 RestartSec=60
 ExecStartPre=-/usr/bin/docker kill systemd_mon
 ExecStartPre=-/usr/bin/docker rm systemd_mon
-ExecStart=/usr/bin/docker run --name "systemd_mon" -v /var/run/dbus:/var/run/dbus -v /path/to/systemd_mon/config/:/systemd_mon/ kromit/systemd_mon
+ExecStart=/usr/bin/docker run --name "systemd_mon" \
+                              -v /var/run/dbus:/var/run/dbus \
+                              -v /path/to/systemd_mon/config/:/systemd_mon/ \
+                              gawindx/systemd_mon:latest
 
 [Install]
 WantedBy=multi-user.target
 ```
+## Podman/Systemd integration
+Just like with Docker, podman can launch the container via Systemd.
+However, the syntax is a bit more complex and requires a few additional parameters to comply with RedHat recommendations:
+```
+# %n == The full unit name, e.g. "nginx.service".
+# %p == The unit's prefix, e.g. "nginx".
+
+[Unit]
+Description=SystemdMon in Container
+After=network.target
+
+[Service]
+Type=forking
+Restart=on-failure
+KillMode=none
+
+# Report variables.
+WorkingDirectory=/Directory/where/the/systemd_mon/data/is/located
+#Start
+ExecStartPre=/usr/bin/rm -f /%t/%n-pid /%t/%n-cid
+ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid \
+                                --cidfile /%t/%n-cid \
+                                --name "%p"\
+                                --rm \
+                                --privileged true \
+                                --replace \
+                                --log-driver journald \
+                                --health-cmd "ping -w 8 -4 -c 1 8.8.8.8 || exit 1" \
+                                --health-interval 30s \
+                                --health-retries 3 \
+                                --health-start-period 120s \
+                                --health-timeout 30s \
+
+                                --network host \
+                                
+                                --volume /var/run/dbus:/var/run/dbus:ro \
+                                --volume /Directory/where/the/systemd_mon/data/is/located:/systemd_mon:Z \
+                                -d \
+                                gawindx/systemd_mon:latest
+
+ExecStop=/usr/bin/sh -c "/usr/bin/podman rm -f `cat /%t/%n-cid`"
+
+[Install]
+WantedBy=multi-user.target
+```
+Podman does not understand the healthcheck syntax in the same way as Docker, it is better to tell it again.
 
 ## Docker-compose Integration
 
@@ -229,3 +299,41 @@ WantedBy=multi-user.target
 The Dockerfile provided incorporates a Healthcheck routine based on an external ping.
 
 It is therefore easy to monitor his condition and his ability to communicate to the outside (willfarrell/autoheal by example)
+
+## SeLinux
+If Selinux is enabled on your system, you risk not being able to launch the container (similar problem when using systemd_mon directly).
+
+To be able to run it without problem:
+- Edit a new file named 'my-systemdmon.te' and insert the following text:
+```
+module my-systemdmon 1.0;
+
+require {
+        type init_t;
+        type systemd_unit_file_t;
+        type system_dbusd_t;
+        type container_t;
+        class dbus send_msg;
+        class system status;
+        class service status;
+        class unix_stream_socket connectto;
+}
+
+#============= container_t ==============
+allow container_t init_t:dbus send_msg;
+allow container_t init_t:system status;
+allow container_t system_dbusd_t:dbus send_msg;
+allow container_t systemd_unit_file_t:service status;
+allow container_t system_dbusd_t:unix_stream_socket connectto;
+```
+Pay attention to the context of your container which should normally be 'container_t', otherwise it will not work
+
+- Then execute the commands in the following order:
+```
+checkmodule -M -m -o my-systemdmon.mod my-systemdmon.te
+semodule_package -o my-systemdmon.pp -m my-systemdmon.mod
+semodule_package -i my-systemdmon.pp
+```
+
+
+
