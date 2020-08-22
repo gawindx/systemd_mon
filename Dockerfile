@@ -28,4 +28,4 @@ HEALTHCHECK --interval=10s --timeout=10s --retries=3 --start-period=120s \
 
 EXPOSE 9000
 
-CMD ["/usr/src/app/bin/systemd_mon", "/systemd_mon/systemd_mon.yml"]
+CMD ["./bin/systemd_mon", "/systemd_mon/systemd_mon.yml"]
