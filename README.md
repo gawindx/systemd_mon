@@ -219,9 +219,7 @@ ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid \
                                 --health-retries 3 \
                                 --health-start-period 120s \
                                 --health-timeout 30s \
-
-                                --network host \
-                                
+                                --network host \                                
                                 --volume /var/run/dbus:/var/run/dbus:ro \
                                 --volume /Directory/where/the/systemd_mon/data/is/located:/systemd_mon:Z \
                                 -d \
