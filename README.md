@@ -211,7 +211,6 @@ ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid \
                                 --cidfile /%t/%n-cid \
                                 --name "%p"\
                                 --rm \
-                                --privileged true \
                                 --replace \
                                 --log-driver journald \
                                 --health-cmd "ping -w 8 -4 -c 1 8.8.8.8 || exit 1" \
