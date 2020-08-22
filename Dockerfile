@@ -1,4 +1,6 @@
 FROM alpine:3.11
+#podman auto-update integration
+LABEL io.containers.autoupdate="image"
 MAINTAINER Decaux Nicolas <decauxnico@gmail.com>
 
 ENV BUILD_PACKAGES bash curl-dev ruby-dev build-base iputils git
@@ -26,4 +28,4 @@ HEALTHCHECK --interval=10s --timeout=10s --retries=3 --start-period=120s \
 
 EXPOSE 9000
 
-CMD ["./bin/systemd_mon", "/systemd_mon/systemd_mon.yml"]
+CMD ["/usr/src/app/bin/systemd_mon", "/systemd_mon/systemd_mon.yml"]
